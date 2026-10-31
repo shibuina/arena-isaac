@@ -3,7 +3,7 @@ import numpy as np
 from isaacsim_msgs.msg import Prim
 from isaacsim_msgs.srv import SpawnPrims
 
-from isaac_utils.utils import geom, light, prim
+from isaac_utils.utils import floor, geom, light, prim
 from isaac_utils.utils.path import world_path
 
 from .utils import Service, on_exception
@@ -29,6 +29,7 @@ def prim_importer(prim_msg: Prim) -> bool:
     if spawned:
         light.demote_emission(spawned)
         light.bind_glow()
+        floor.keep_ground_below(spawned)
 
     return True
 
