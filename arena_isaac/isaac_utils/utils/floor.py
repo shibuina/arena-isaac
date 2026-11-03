@@ -1,4 +1,4 @@
-"""Floor height under a point, for pedestrians in worlds whose floor is not at z 0."""
+"""Floor height under a point, for pedestrians and robots in worlds whose floor is not at z 0."""
 
 from __future__ import annotations
 
@@ -15,8 +15,9 @@ if TYPE_CHECKING:
 # of the heights of their flat, upward facing triangles, so a lookup is numpy only: PhysX ray casts from the physics tick
 # returned nothing at times and crashed Isaac, and from a spawn service call they stalled it past the caller's timeout.
 # A walker stands on the highest surface up to STEP above its last floor and climbs at most SLOPE per meter walked, so it
-# takes stairs and ramps but not a table, a ledge or a wall's bumps. Robots are not ground-followed (one spawned over a
-# lower floor drops onto it). ARENA_ISAAC_GROUND_FOLLOW=0 turns it off.
+# takes stairs and ramps but not a table, a ledge or a wall's bumps. A robot is set on the floor under it as a first
+# placement wherever it is spawned or moved (geom.move), and physics carries it from there. ARENA_ISAAC_GROUND_FOLLOW=0
+# turns it off.
 
 ENABLED = os.environ.get("ARENA_ISAAC_GROUND_FOLLOW", "1") != "0"
 CELL = 0.2  # m, grid cell

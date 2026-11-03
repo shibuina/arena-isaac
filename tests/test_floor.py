@@ -42,6 +42,12 @@ def test_a_raised_floor_is_found_on_a_first_placement_only() -> None:
     assert floor_from(raised.heights(1.0, 1.0), 0.0, first=False) is None
 
 
+def test_a_placement_keeps_the_floor_of_its_stacked_level() -> None:
+    stacked = FloorGrid(np.array(_square(0, 0, 2, 2, 0.0) + _square(0, 0, 2, 2, 3.0)))
+    assert floor_from(stacked.heights(1.0, 1.0), 3.0, first=True) == pytest.approx(3.0)
+    assert floor_from(stacked.heights(1.0, 1.0), 0.0, first=True) == pytest.approx(0.0)
+
+
 def test_a_walker_climbs_at_most_slope_times_its_walk() -> None:
     assert climb(0.0, 0.17, 0.3) == pytest.approx(0.17)  # a stair riser after a tread
     assert climb(0.0, 0.4, 0.1) == pytest.approx(SLOPE * 0.1)  # a ledge beside the path
