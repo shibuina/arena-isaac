@@ -18,13 +18,7 @@ if TYPE_CHECKING:
 # takes stairs and ramps but not a table, a ledge or a wall's bumps. Robots are not ground-followed (one spawned over a
 # lower floor drops onto it). ARENA_ISAAC_GROUND_FOLLOW=0 turns it off.
 
-# The safety ground plane run_isaacsim adds at z -1 is an infinite PhysX plane: a scan whose floors go below it gets an
-# invisible floor across its ramps that robots drive on (smu_link_full's ramp drops to -2.35). keep_ground_below moves
-# it under the lowest static collider of every spawned asset.
-
 ENABLED = os.environ.get("ARENA_ISAAC_GROUND_FOLLOW", "1") != "0"
-GROUND_PATH = "/World/groundPlane"
-GROUND_BELOW = 1.0  # m the safety ground plane keeps under the lowest static collider
 CELL = 0.2  # m, grid cell
 FLAT = 0.85  # least upward share of a triangle's normal for it to be floor: slopes up to ~30 deg
 STEP = 0.25  # m above the last floor a walker may find the next one: a stair riser or a stretch of ramp
@@ -98,43 +92,13 @@ def floor_under(x: float, y: float, z: float, *, first: bool = False) -> float |
     return floor_from(_grid.heights(x, y), z, first) if _grid is not None else None
 
 
-def ground_z(current: float, lowest: float | None) -> float:
-    """The safety ground plane's height: where it is, or GROUND_BELOW under the lowest static collider when that is lower."""
-    return current if lowest is None else min(current, lowest - GROUND_BELOW)
-
-
-def keep_ground_below(root: Usd.Prim) -> None:
-    """Lower the safety ground plane under the static collision meshes of a spawned asset, if they reach below it."""
+def _static_collision_meshes() -> list[Usd.Prim]:
+    """Every collision mesh prim that is not part of a rigid body or articulation (robots, dynamic obstacles)."""
     import omni.usd
-    from pxr import UsdGeom
-
-    from isaac_utils.utils import geom
-
-    ground = omni.usd.get_context().get_stage().GetPrimAtPath(GROUND_PATH)
-    meshes = _static_collision_meshes(root)
-    if not ground.IsValid() or not meshes:
-        return
-    cache = UsdGeom.XformCache()
-
-    def bottom(prim: Usd.Prim) -> float | None:
-        points = np.asarray(UsdGeom.Mesh(prim).GetPointsAttr().Get() or [], float).reshape(-1, 3)
-        matrix = np.asarray(cache.GetLocalToWorldTransform(prim))  # row vectors: world = point @ matrix
-        return float((points @ matrix[:3, 2] + matrix[3, 2]).min()) if len(points) else None
-
-    bottoms = [z for z in map(bottom, meshes) if z is not None]
-    current = float(cache.GetLocalToWorldTransform(ground).ExtractTranslation()[2])
-    target = ground_z(current, min(bottoms) if bottoms else None)
-    if target < current:
-        geom.move(GROUND_PATH, translation=geom.Translation(0.0, 0.0, target))
-
-
-def _static_collision_meshes(root: Usd.Prim | None = None) -> list[Usd.Prim]:
-    """Every collision mesh prim (under root, else on the stage) that is not part of a rigid body or articulation (robots, dynamic obstacles)."""
-    import omni.usd
-    from pxr import Usd, UsdGeom, UsdPhysics
+    from pxr import UsdGeom, UsdPhysics
 
     prims = []
-    for prim in Usd.PrimRange(root) if root is not None else omni.usd.get_context().get_stage().Traverse():
+    for prim in omni.usd.get_context().get_stage().Traverse():
         if not prim.IsA(UsdGeom.Mesh) or not prim.HasAPI(UsdPhysics.CollisionAPI):
             continue
         parent = prim

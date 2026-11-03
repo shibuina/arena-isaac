@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from isaac_utils.utils.floor import GROUND_BELOW, SLOPE, FloorGrid, climb, floor_from, ground_z
+from isaac_utils.utils.floor import SLOPE, FloorGrid, climb, floor_from
 
 
 def _square(x0: float, y0: float, x1: float, y1: float, z0: float, z1: float | None = None) -> list[list[list[float]]]:
@@ -47,9 +47,3 @@ def test_a_walker_climbs_at_most_slope_times_its_walk() -> None:
     assert climb(0.0, 0.4, 0.1) == pytest.approx(SLOPE * 0.1)  # a ledge beside the path
     assert climb(0.0, 0.4, 0.0) == pytest.approx(0.0)  # standing still never climbs
     assert climb(0.0, -2.3, 0.05) == pytest.approx(-2.3)  # stepping down is immediate
-
-
-def test_the_safety_ground_plane_goes_under_a_lower_floor_only() -> None:
-    assert ground_z(-1.0, -2.4) == pytest.approx(-2.4 - GROUND_BELOW)  # a scan's lower concourse
-    assert ground_z(-1.0, 0.0) == pytest.approx(-1.0)  # a flat world keeps the plane where it is
-    assert ground_z(-1.0, None) == pytest.approx(-1.0)  # an asset without colliders
