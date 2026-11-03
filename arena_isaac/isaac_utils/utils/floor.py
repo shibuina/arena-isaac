@@ -19,7 +19,11 @@ if TYPE_CHECKING:
 # placement wherever it is spawned or moved (geom.move), and physics carries it from there. ARENA_ISAAC_GROUND_FOLLOW=0
 # turns it off.
 
+# run_isaacsim's safety ground plane (z -3) is a collision mesh too, but no floor: flat worlds build their floors from
+# cubes the grid does not read, so the plane would be the only surface there and drop walkers and robots onto it.
+
 ENABLED = os.environ.get("ARENA_ISAAC_GROUND_FOLLOW", "1") != "0"
+GROUND_PATH = "/World/groundPlane"
 CELL = 0.2  # m, grid cell
 FLAT = 0.85  # least upward share of a triangle's normal for it to be floor: slopes up to ~30 deg
 STEP = 0.25  # m above the last floor a walker may find the next one: a stair riser or a stretch of ramp
@@ -85,7 +89,7 @@ def floor_under(x: float, y: float, z: float, *, first: bool = False) -> float |
     global _grid, _fingerprint, _checked
     if time.monotonic() - _checked > CHECK:
         _checked = time.monotonic()
-        prims = _static_collision_meshes()
+        prims = static_collision_meshes()
         fingerprint = tuple(str(prim.GetPath()) for prim in prims)
         if fingerprint != _fingerprint:
             triangles = [_triangles(prim) for prim in prims]
@@ -93,14 +97,18 @@ def floor_under(x: float, y: float, z: float, *, first: bool = False) -> float |
     return floor_from(_grid.heights(x, y), z, first) if _grid is not None else None
 
 
-def _static_collision_meshes() -> list[Usd.Prim]:
-    """Every collision mesh prim that is not part of a rigid body or articulation (robots, dynamic obstacles)."""
-    import omni.usd
-    from pxr import UsdGeom, UsdPhysics
+def static_collision_meshes(stage: Usd.Stage | None = None) -> list[Usd.Prim]:
+    """Every collision mesh prim of the stage (the open one by default) outside a rigid body, an articulation (robots, dynamic obstacles) and the safety ground plane."""
+    from pxr import Sdf, UsdGeom, UsdPhysics
 
+    if stage is None:
+        import omni.usd
+
+        stage = omni.usd.get_context().get_stage()
+    ground = Sdf.Path(GROUND_PATH)
     prims = []
-    for prim in omni.usd.get_context().get_stage().Traverse():
-        if not prim.IsA(UsdGeom.Mesh) or not prim.HasAPI(UsdPhysics.CollisionAPI):
+    for prim in stage.Traverse():
+        if not prim.IsA(UsdGeom.Mesh) or not prim.HasAPI(UsdPhysics.CollisionAPI) or prim.GetPath().HasPrefix(ground):
             continue
         parent = prim
         while parent.IsValid() and not (parent.HasAPI(UsdPhysics.RigidBodyAPI) or parent.HasAPI(UsdPhysics.ArticulationRootAPI)):

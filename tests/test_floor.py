@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from isaac_utils.utils.floor import SLOPE, FloorGrid, climb, floor_from
+from isaac_utils.utils.floor import SLOPE, FloorGrid, climb, floor_from, static_collision_meshes
 
 
 def _square(x0: float, y0: float, x1: float, y1: float, z0: float, z1: float | None = None) -> list[list[list[float]]]:
@@ -53,3 +53,17 @@ def test_a_walker_climbs_at_most_slope_times_its_walk() -> None:
     assert climb(0.0, 0.4, 0.1) == pytest.approx(SLOPE * 0.1)  # a ledge beside the path
     assert climb(0.0, 0.4, 0.0) == pytest.approx(0.0)  # standing still never climbs
     assert climb(0.0, -2.3, 0.05) == pytest.approx(-2.3)  # stepping down is immediate
+
+
+def test_the_safety_ground_plane_is_no_floor() -> None:
+    pytest.importorskip("pxr")
+    from pxr import Usd, UsdGeom, UsdPhysics
+
+    stage = Usd.Stage.CreateInMemory()
+    for path, z in (("/World/groundPlane/CollisionMesh", -3.0), ("/World/scan/floor", -2.3)):
+        mesh = UsdGeom.Mesh.Define(stage, path)
+        mesh.CreatePointsAttr([(0.0, 0.0, z), (1.0, 0.0, z), (1.0, 1.0, z)])
+        mesh.CreateFaceVertexCountsAttr([3])
+        mesh.CreateFaceVertexIndicesAttr([0, 1, 2])
+        UsdPhysics.CollisionAPI.Apply(mesh.GetPrim())
+    assert [str(prim.GetPath()) for prim in static_collision_meshes(stage)] == ["/World/scan/floor"]
